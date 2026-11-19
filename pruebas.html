@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pruebas del detector</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 1.5rem; margin: 0 0 12px; }
+    #resumen {
+      font-size: 1.2rem;
+      font-weight: 700;
+      padding: 14px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+    .todo-bien { background: #dcfce7; color: #166534; }
+    .hay-fallas { background: #fee2e2; color: #991b1b; }
+    .caso {
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border-left: 5px solid;
+    }
+    .ok { border-color: #16a34a; }
+    .falla { border-color: #dc2626; background: #fff5f5; }
+    .enlace {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      word-break: break-all;
+      font-weight: 600;
+    }
+    .detalle { font-size: .92rem; color: #4b5563; margin-top: 4px; }
+    .motivos { font-size: .88rem; color: #6b7280; margin: 4px 0 0; padding-left: 18px; }
+    a { color: #2563eb; }
+    h2 { font-size: 1.1rem; margin: 20px 0 8px; }
+    .caso::after { content: ""; display: block; clear: both; }
+    .miniatura {
+      float: right; width: 64px; height: 64px; margin-left: 10px;
+      border: 1px solid #e5e7eb; border-radius: 6px; background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pruebas del detector</h1>
+    <div id="resumen"></div>
+    <div id="lista"></div>
+    <p><a href="index.html">← Volver al detector</a></p>
+  </main>
+
+  <script src="reglas.js"></script>
+  <script src="jsQR.js"></script>
+  <script src="lector-qr.js"></script>
+  <script src="casos.js"></script>
+  <script src="casos-qr.js"></script>
+  <script>
+    const lista = document.getElementById("lista");
+    const resumen = document.getElementById("resumen");
+    let aciertos = 0;
+    let total = 0;
+
+    function crear(etiqueta, texto, clase) {
+      const el = document.createElement(etiqueta);
+      if (texto) el.textContent = texto;
+      if (clase) el.className = clase;
+      return el;
+    }
+
+    // Dibuja una tarjeta con el resultado de un caso.
+    function mostrarCaso(titulo, paso, detalle, motivos, imagen) {
+      total++;
+      if (paso) aciertos++;
+      const div = crear("div", null, "caso " + (paso ? "ok" : "falla"));
+      if (imagen) {
+        const img = document.createElement("img");
+        img.src = imagen;
+        img.alt = "";
+        img.className = "miniatura";
+        div.appendChild(img);
+      }
+      div.appendChild(crear("div", (paso ? "✅ " : "❌ ") + titulo, "enlace"));
+      div.appendChild(crear("div", detalle, "detalle"));
+      if (motivos.length > 0) {
+        const ul = crear("ul", null, "motivos");
+        motivos.forEach((m) => ul.appendChild(crear("li", m)));
+        div.appendChild(ul);
+      }
+      lista.appendChild(div);
+    }
+
+    async function ejecutarPruebas() {
+      // --- Parte 1: enlaces escritos (casos.js) ---
+      lista.appendChild(crear("h2", "Enlaces escritos"));
+      CASOS.forEach(function (caso) {
+        const r = analizarEnlace(caso.enlace);
+        mostrarCaso(
+          caso.enlace === "" ? "(vacío)" : caso.enlace,
+          r.estado === caso.esperado,
+          "Esperado: " + caso.esperado + " · Obtenido: " + r.estado,
+          r.motivos
+        );
+      });
+
+      // --- Parte 2: imágenes de códigos QR (casos-qr.js) ---
+      lista.appendChild(crear("h2", "Imágenes de códigos QR"));
+      for (const caso of CASOS_QR) {
+        const r = await revisarImagenQR(caso.imagen);
+        // Debe leer el texto correcto Y dar el estado correcto.
+        const leyoBien = r.textoQR === caso.textoEsperado;
+        const paso = leyoBien && r.estado === caso.esperado;
+        mostrarCaso(
+          caso.nombre,
+          paso,
+          "Leído: " + (r.textoQR === null ? "(nada)" : r.textoQR) +
+            " · Esperado: " + caso.esperado + " · Obtenido: " + r.estado,
+          r.motivos,
+          caso.imagen
+        );
+      }
+
+      resumen.textContent = aciertos + " de " + total + " casos dieron el estado esperado";
+      resumen.className = aciertos === total ? "todo-bien" : "hay-fallas";
+    }
+
+    resumen.textContent = "Ejecutando pruebas…";
+    ejecutarPruebas();
+  </script>
+</body>
+</html>
