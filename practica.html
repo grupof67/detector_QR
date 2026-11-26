@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modo práctica</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      line-height: 1.5;
+    }
+    main { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 1.5rem; margin: 0 0 4px; }
+    h2 { font-size: 1.15rem; margin: 0 0 8px; }
+    .ayuda { margin: 0 0 20px; color: #4b5563; }
+    [hidden] { display: none !important; }
+    .tarjeta {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #fff;
+      background: #2563eb;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:active { background: #1d4ed8; }
+    button:disabled { opacity: .45; cursor: default; }
+    a { color: #2563eb; }
+    details { margin-top: 16px; }
+    summary { cursor: pointer; font-weight: 600; color: #2563eb; }
+    .senales { margin: 8px 0 0; padding-left: 20px; }
+    .senales li { margin-bottom: 6px; }
+
+    /* Progreso */
+    .progreso-texto { display: flex; justify-content: space-between; font-size: .9rem; color: #4b5563; }
+    .barra { height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin: 6px 0 16px; }
+    .barra div { height: 100%; background: #2563eb; width: 0; transition: width .3s; }
+
+    .lugar { margin: 0 0 12px; font-size: .95rem; color: #4b5563; }
+    /* Imita la vista previa que muestra la cámara del celular al leer un QR */
+    .vista-camara {
+      background: #111827;
+      color: #f9fafb;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .vista-camara small { color: #9ca3af; display: block; margin-bottom: 4px; }
+    .enlace {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 1.05rem;
+      word-break: break-all;
+    }
+    /* El dominio aparece resaltado después de responder */
+    .enlace mark { background: #fde68a; color: #111827; border-radius: 3px; padding: 0 2px; }
+    .pregunta { font-weight: 600; margin: 16px 0 0; }
+    .opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .opciones button { margin-top: 10px; }
+    .btn-seguro { background: #16a34a; }
+    .btn-seguro:active { background: #15803d; }
+    .btn-sospechoso { background: #dc2626; }
+    .btn-sospechoso:active { background: #b91c1c; }
+
+    /* Explicación después de responder */
+    .explicacion { margin-top: 16px; border-radius: 12px; padding: 16px; border-left: 6px solid; }
+    .explicacion p { margin: 6px 0; }
+    .explicacion ul { margin: 8px 0; padding-left: 20px; }
+    .acierto { background: #f0fdf4; border-color: #16a34a; }
+    .acierto h2 { color: #15803d; }
+    .error { background: #fef2f2; border-color: #dc2626; }
+    .error h2 { color: #b91c1c; }
+    .dominio {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      background: rgba(255,255,255,.8);
+      padding: 2px 6px; border-radius: 6px; word-break: break-all;
+    }
+
+    /* Resultado final */
+    .puntaje { font-size: 3rem; font-weight: 800; text-align: center; margin: 8px 0 0; }
+    .mensaje-final { text-align: center; font-size: 1.1rem; margin: 0 0 8px; }
+    .repaso { padding-left: 20px; }
+    .repaso li { margin-bottom: 8px; }
+    .repaso .enlace { font-size: .9rem; }
+    .pie { margin-top: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🎓 Modo práctica</h1>
+    <p class="ayuda">Aprende a reconocer los códigos QR sospechosos antes de abrirlos.</p>
+
+    <!-- Pantalla 1: inicio -->
+    <section id="pantalla-inicio" class="tarjeta">
+      <h2>¿Cómo funciona?</h2>
+      <p>Verás <strong>10 enlaces</strong>, como los que muestra la cámara del celular al leer un código QR, y el lugar donde estaba el código.</p>
+      <p>En cada uno, decide si <strong>parece seguro</strong> o si <strong>es sospechoso</strong>. Después te explicamos la respuesta.</p>
+      <p>Nada se abre: es solo práctica.</p>
+      <details>
+        <summary>Ver las 5 señales de riesgo</summary>
+        <ol class="senales" id="lista-senales-inicio"></ol>
+      </details>
+      <button type="button" id="empezar">Empezar</button>
+    </section>
+
+    <!-- Pantalla 2: preguntas -->
+    <section id="pantalla-pregunta" class="tarjeta" hidden>
+      <div class="progreso-texto">
+        <span id="numero-pregunta"></span>
+        <span id="aciertos-parciales"></span>
+      </div>
+      <div class="barra"><div id="barra-progreso"></div></div>
+
+      <p class="lugar" id="lugar"></p>
+      <div class="vista-camara">
+        <small>La cámara leyó este enlace:</small>
+        <div class="enlace" id="enlace"></div>
+      </div>
+
+      <p class="pregunta">¿Qué te parece?</p>
+      <div class="opciones">
+        <button type="button" class="btn-seguro" id="btn-seguro">✅ Parece seguro</button>
+        <button type="button" class="btn-sospechoso" id="btn-sospechoso">⚠️ Es sospechoso</button>
+      </div>
+
+      <div id="explicacion" aria-live="polite"></div>
+      <button type="button" id="siguiente" hidden>Siguiente →</button>
+    </section>
+
+    <!-- Pantalla 3: resultado final -->
+    <section id="pantalla-final" class="tarjeta" hidden>
+      <h2>Tu resultado</h2>
+      <p class="puntaje" id="puntaje"></p>
+      <p class="mensaje-final" id="mensaje-final"></p>
+
+      <div id="bloque-repaso">
+        <h2>Para repasar</h2>
+        <ul class="repaso" id="repaso"></ul>
+      </div>
+
+      <h2>Las 5 señales para recordar</h2>
+      <ol class="senales" id="lista-senales-final"></ol>
+      <p>Y aunque no haya señales, <strong>mira siempre el dominio</strong> y confirma que es el sitio que esperabas.</p>
+
+      <button type="button" id="otra-vez">Practicar de nuevo</button>
+    </section>
+
+    <p class="pie"><a href="index.html">← Volver al detector</a></p>
+  </main>
+
+  <script src="reglas.js"></script>
+  <script src="practica.js"></script>
+  <script>
+    // Las 5 señales, explicadas en palabras simples.
+    const SENALES = [
+      "Enlace acortado (bit.ly, tinyurl.com, t.co, cutt.ly): no muestra a dónde lleva.",
+      "Empieza con http:// en vez de https://: la conexión no es segura.",
+      "Usa números (como 192.168.10.24) en vez de un nombre de sitio.",
+      "Imita un sitio conocido: cambia 1 o 2 letras (paypa1, gooogle) o pega el nombre real a otro dominio (paypal.com.algo.xyz).",
+      "Termina en .xyz, .top, .click o .link: poco habitual en comercios.",
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    let ronda = [];      // los ejercicios de esta ronda
+    let actual = 0;      // número de la pregunta actual (desde 0)
+    let aciertos = 0;
+    let errores = [];    // ejercicios que se respondieron mal
+
+    // Crea un elemento con texto (textContent: nunca se ejecuta como código).
+    function crear(etiqueta, texto, clase) {
+      const el = document.createElement(etiqueta);
+      if (texto) el.textContent = texto;
+      if (clase) el.className = clase;
+      return el;
+    }
+
+    function llenarSenales(lista) {
+      SENALES.forEach((s) => lista.appendChild(crear("li", s)));
+    }
+
+    function mostrarPantalla(nombre) {
+      ["inicio", "pregunta", "final"].forEach((p) => {
+        $("pantalla-" + p).hidden = p !== nombre;
+      });
+      window.scrollTo(0, 0);
+    }
+
+    // Escribe el enlace y, si se pide, resalta el dominio para enseñar
+    // que es la parte más importante.
+    function escribirEnlace(contenedor, enlace, dominio) {
+      contenedor.innerHTML = "";
+      const pos = dominio ? enlace.toLowerCase().indexOf(dominio.toLowerCase()) : -1;
+      if (pos === -1) {
+        contenedor.textContent = enlace;
+        return;
+      }
+      contenedor.appendChild(document.createTextNode(enlace.slice(0, pos)));
+      contenedor.appendChild(crear("mark", enlace.slice(pos, pos + dominio.length)));
+      contenedor.appendChild(document.createTextNode(enlace.slice(pos + dominio.length)));
+    }
+
+    function empezar() {
+      ronda = elegirEjercicios(PREGUNTAS_POR_RONDA);
+      actual = 0;
+      aciertos = 0;
+      errores = [];
+      mostrarPantalla("pregunta");
+      mostrarPregunta();
+    }
+
+    function mostrarPregunta() {
+      const ej = ronda[actual];
+      $("numero-pregunta").textContent = "Pregunta " + (actual + 1) + " de " + ronda.length;
+      $("aciertos-parciales").textContent = "Aciertos: " + aciertos;
+      $("barra-progreso").style.width = (actual / ronda.length) * 100 + "%";
+      $("lugar").textContent = "📍 " + ej.lugar;
+      escribirEnlace($("enlace"), ej.enlace, null);
+      $("explicacion").innerHTML = "";
+      $("btn-seguro").disabled = false;
+      $("btn-sospechoso").disabled = false;
+      $("siguiente").hidden = true;
+    }
+
+    // respuesta: "Sin señales" (parece seguro) o "Señal de riesgo" (sospechoso)
+    function responder(respuesta) {
+      const ej = ronda[actual];
+      const analisis = analizarEnlace(ej.enlace); // las mismas reglas del detector
+      const correcto = respuesta === ej.esperado;
+      if (correcto) aciertos++;
+      else errores.push(ej);
+
+      $("btn-seguro").disabled = true;
+      $("btn-sospechoso").disabled = true;
+      $("aciertos-parciales").textContent = "Aciertos: " + aciertos;
+      escribirEnlace($("enlace"), ej.enlace, analisis.dominio);
+
+      // Armamos la explicación.
+      const caja = crear("div", null, "explicacion " + (correcto ? "acierto" : "error"));
+      caja.appendChild(crear("h2", correcto ? "🎉 ¡Correcto!" : "❌ No era así"));
+      const respuestaCorrecta = crear("p", "Respuesta correcta: ");
+      respuestaCorrecta.appendChild(crear("strong",
+        ej.esperado === ESTADOS.RIESGO ? "⚠️ Es sospechoso" : "✅ Parece seguro"));
+      caja.appendChild(respuestaCorrecta);
+
+      const sitio = crear("p", "El sitio real es: ");
+      sitio.appendChild(crear("span", analisis.dominio, "dominio"));
+      caja.appendChild(sitio);
+
+      if (ej.esperado === ESTADOS.RIESGO) {
+        caja.appendChild(crear("p", "Es sospechoso porque:"));
+        const lista = crear("ul");
+        analisis.motivos.forEach((m) => lista.appendChild(crear("li", m)));
+        caja.appendChild(lista);
+      } else {
+        caja.appendChild(crear("p",
+          "No tiene ninguna de las 5 señales de riesgo. Aun así, confirma " +
+          "siempre que el dominio sea el del sitio que esperabas."));
+      }
+      $("explicacion").appendChild(caja);
+
+      const esUltima = actual === ronda.length - 1;
+      $("siguiente").textContent = esUltima ? "Ver mi resultado" : "Siguiente →";
+      $("siguiente").hidden = false;
+      $("siguiente").focus();
+    }
+
+    function siguiente() {
+      actual++;
+      if (actual < ronda.length) mostrarPregunta();
+      else mostrarFinal();
+    }
+
+    function mostrarFinal() {
+      mostrarPantalla("final");
+      $("puntaje").textContent = aciertos + " / " + ronda.length;
+
+      const porcentaje = aciertos / ronda.length;
+      let mensaje;
+      if (porcentaje === 1) mensaje = "¡Excelente! Reconociste todos los casos.";
+      else if (porcentaje >= 0.7) mensaje = "¡Muy bien! Ya reconoces la mayoría de las señales.";
+      else if (porcentaje >= 0.5) mensaje = "Vas bien. Repasa las señales y vuelve a intentarlo.";
+      else mensaje = "Sigue practicando: revisa las 5 señales de abajo y prueba otra vez.";
+      $("mensaje-final").textContent = mensaje;
+
+      // Repaso de las preguntas que salieron mal.
+      const repaso = $("repaso");
+      repaso.innerHTML = "";
+      $("bloque-repaso").hidden = errores.length === 0;
+      errores.forEach((ej) => {
+        const li = crear("li");
+        li.appendChild(crear("div", ej.enlace, "enlace"));
+        const analisis = analizarEnlace(ej.enlace);
+        const explicacion = ej.esperado === ESTADOS.RIESGO
+          ? "Era sospechoso: " + analisis.motivos.join(" ")
+          : "Era un sitio sin señales de riesgo.";
+        li.appendChild(crear("div", explicacion));
+        repaso.appendChild(li);
+      });
+    }
+
+    llenarSenales($("lista-senales-inicio"));
+    llenarSenales($("lista-senales-final"));
+    $("empezar").addEventListener("click", empezar);
+    $("otra-vez").addEventListener("click", empezar);
+    $("btn-seguro").addEventListener("click", () => responder(ESTADOS.SIN_SENALES));
+    $("btn-sospechoso").addEventListener("click", () => responder(ESTADOS.RIESGO));
+    $("siguiente").addEventListener("click", siguiente);
+  </script>
+</body>
+</html>

@@ -61,6 +61,7 @@
   <script src="lector-qr.js"></script>
   <script src="casos.js"></script>
   <script src="casos-qr.js"></script>
+  <script src="practica.js"></script>
   <script>
     const lista = document.getElementById("lista");
     const resumen = document.getElementById("resumen");
@@ -125,6 +126,20 @@
           caso.imagen
         );
       }
+
+      // --- Parte 3: ejercicios del modo práctica (practica.js) ---
+      // Revisa que la respuesta correcta de cada ejercicio coincida con
+      // lo que dicen las reglas, para no enseñar algo equivocado.
+      lista.appendChild(crear("h2", "Ejercicios del modo práctica"));
+      EJERCICIOS_PRACTICA.forEach(function (ej) {
+        const r = analizarEnlace(ej.enlace);
+        mostrarCaso(
+          ej.enlace,
+          r.estado === ej.esperado,
+          "Lugar: " + ej.lugar + " · Esperado: " + ej.esperado + " · Obtenido: " + r.estado,
+          r.motivos
+        );
+      });
 
       resumen.textContent = aciertos + " de " + total + " casos dieron el estado esperado";
       resumen.className = aciertos === total ? "todo-bien" : "hay-fallas";
