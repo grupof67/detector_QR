@@ -71,6 +71,40 @@
     #foto { position: absolute; width: 1px; height: 1px; opacity: 0; }
     #foto:focus-visible + .boton-foto { outline: 3px solid #2563eb; }
     .pista { font-size: .85rem; color: #6b7280; margin: 8px 0 0; text-align: center; }
+    .boton-camara {
+      background: #0f766e;
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+    .boton-camara:active { background: #115e59; }
+
+    /* Pantalla del escáner: ocupa toda la pantalla, fondo negro */
+    #escaner {
+      position: fixed; inset: 0; z-index: 10;
+      background: #000;
+      display: flex; flex-direction: column;
+    }
+    #escaner[hidden] { display: none; }
+    .visor { position: relative; flex: 1; overflow: hidden; }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Cuadro guía: muestra dónde poner el QR */
+    .guia {
+      position: absolute; top: 50%; left: 50%;
+      width: min(70vw, 70vh, 320px); aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border: 4px solid #fff; border-radius: 16px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+    }
+    .instruccion {
+      position: absolute; left: 0; right: 0; top: 24px;
+      color: #fff; text-align: center; font-size: 1.1rem; font-weight: 600;
+      text-shadow: 0 1px 3px rgba(0,0,0,.8); padding: 0 16px;
+    }
+    .barra-escaner { padding: 16px; background: #000; }
+    .barra-escaner button { margin: 0; background: #374151; }
+    .aviso-camara { background: #fffbeb; border-color: #d97706; }
+    .aviso-camara h2 { color: #92400e; }
+
     .contenido-qr {
       font-family: ui-monospace, Menlo, Consolas, monospace;
       font-size: .9rem; word-break: break-all; color: #4b5563;
@@ -104,7 +138,7 @@
 <body>
   <main>
     <h1>Detector de QR sospechosos</h1>
-    <p class="ayuda">Sube una foto del código QR o pega su enlace. Lo revisamos sin abrirlo.</p>
+    <p class="ayuda">Escanea el código QR con la cámara, sube una foto o pega su enlace. Lo revisamos sin abrirlo.</p>
 
     <form id="formulario" class="tarjeta">
       <label for="enlace">Enlace del código QR</label>
@@ -115,6 +149,7 @@
 
       <div class="separador">o</div>
 
+      <button type="button" id="abrir-camara" class="boton-camara">🎥 Escanear con la cámara</button>
       <!-- En el celular, este botón ofrece sacar una foto o elegir una de la galería -->
       <input id="foto" type="file" accept="image/*">
       <label for="foto" class="boton-foto">📷 Subir foto del QR</label>
@@ -124,17 +159,34 @@
     <!-- aria-live hace que los lectores de pantalla lean el resultado -->
     <section id="resultado" aria-live="polite"></section>
 
+    <!-- Pantalla del escáner (escondida hasta que se aprieta el botón) -->
+    <div id="escaner" hidden role="dialog" aria-label="Escáner de códigos QR">
+      <div class="visor">
+        <!-- playsinline: en iPhone evita que el video se abra a pantalla completa -->
+        <video id="video" playsinline muted></video>
+        <div class="guia"></div>
+        <p class="instruccion" id="instruccion">Apunta al código QR</p>
+      </div>
+      <div class="barra-escaner">
+        <button type="button" id="cerrar-camara">Cancelar</button>
+      </div>
+    </div>
+
     <footer><a href="pruebas.html">Ver pruebas automáticas</a></footer>
   </main>
 
   <script src="reglas.js"></script>
   <script src="jsQR.js"></script>
   <script src="lector-qr.js"></script>
+  <script src="camara.js"></script>
   <script>
     const formulario = document.getElementById("formulario");
     const campo = document.getElementById("enlace");
     const resultado = document.getElementById("resultado");
     const foto = document.getElementById("foto");
+    const escaner = document.getElementById("escaner");
+    const video = document.getElementById("video");
+    const instruccion = document.getElementById("instruccion");
 
     // Crea un elemento HTML con texto. Usamos textContent (no innerHTML)
     // para que nada de lo que pegue la persona se ejecute como código.
@@ -190,6 +242,57 @@
     formulario.addEventListener("submit", function (evento) {
       evento.preventDefault(); // evita que la página se recargue
       mostrar(analizarEnlace(campo.value));
+    });
+
+    // Muestra un aviso simple (por ejemplo, cuando la cámara no funciona).
+    function mostrarAviso(titulo, texto) {
+      resultado.innerHTML = "";
+      const caja = crear("div", null, "caja aviso-camara");
+      caja.appendChild(crear("h2", titulo));
+      caja.appendChild(crear("p", texto));
+      resultado.appendChild(caja);
+    }
+
+    // ----- Modo cámara -----
+    function abrirEscaner() {
+      escaner.hidden = false;
+      document.body.style.overflow = "hidden"; // evita que la página se mueva atrás
+      instruccion.textContent = "Encendiendo la cámara…";
+
+      iniciarCamara(
+        video,
+        function alEncontrar(texto) {
+          cerrarEscaner();
+          if (navigator.vibrate) navigator.vibrate(100); // pequeña vibración
+          campo.value = texto;
+          mostrar(revisarTextoQR(texto));
+          resultado.scrollIntoView({ behavior: "smooth" });
+        },
+        function alFallar(mensaje) {
+          cerrarEscaner();
+          mostrarAviso("📷 No se pudo usar la cámara", mensaje);
+        }
+      ).then(function () {
+        if (!escaner.hidden) instruccion.textContent = "Apunta al código QR";
+      });
+    }
+
+    function cerrarEscaner() {
+      detenerCamara(video);
+      escaner.hidden = true;
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("abrir-camara").addEventListener("click", abrirEscaner);
+    document.getElementById("cerrar-camara").addEventListener("click", cerrarEscaner);
+
+    // Si la persona cambia de app o de pestaña, apagamos la cámara.
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && !escaner.hidden) cerrarEscaner();
+    });
+    // En el computador, la tecla Esc también cierra el escáner.
+    document.addEventListener("keydown", function (evento) {
+      if (evento.key === "Escape" && !escaner.hidden) cerrarEscaner();
     });
 
     // Revisa una imagen: muestra "Leyendo...", lee el QR y muestra el resultado.

@@ -29,17 +29,23 @@ function cargarImagen(fuente) {
   });
 }
 
-// Busca un QR dentro de una imagen ya cargada.
+// Busca un QR dentro de una imagen ya cargada (o un cuadro de video).
 // Devuelve el texto del QR, o null si no encontró ninguno.
-function leerQRDeImagen(img) {
+// "tamanos" es opcional: la cámara usa uno solo y pequeño para ir rápido.
+function leerQRDeImagen(img, tamanos) {
   const lienzo = document.createElement("canvas");
   const ctx = lienzo.getContext("2d", { willReadFrequently: true });
 
-  for (const maximo of TAMANOS_A_PROBAR) {
+  // Las fotos dicen su tamaño en width/height; los videos en videoWidth/videoHeight.
+  const ancho = img.videoWidth || img.naturalWidth || img.width;
+  const alto = img.videoHeight || img.naturalHeight || img.height;
+  if (!ancho || !alto) return null;
+
+  for (const maximo of tamanos || TAMANOS_A_PROBAR) {
     // Calculamos el nuevo tamaño sin deformar la imagen.
-    const escala = Math.min(1, maximo / Math.max(img.width, img.height));
-    lienzo.width = Math.round(img.width * escala);
-    lienzo.height = Math.round(img.height * escala);
+    const escala = Math.min(1, maximo / Math.max(ancho, alto));
+    lienzo.width = Math.round(ancho * escala);
+    lienzo.height = Math.round(alto * escala);
 
     // Fondo blanco (por si la imagen es transparente) y luego la imagen.
     ctx.fillStyle = "#fff";
@@ -78,7 +84,12 @@ async function revisarImagenQR(fuente) {
     };
   }
 
-  // Desde aquí es igual que pegar el enlace a mano.
+  return revisarTextoQR(texto);
+}
+
+// Recibe el texto que traía un QR (de una foto o de la cámara) y aplica
+// las 5 reglas. Desde aquí es igual que pegar el enlace a mano.
+function revisarTextoQR(texto) {
   const resultado = analizarEnlace(texto);
   resultado.textoQR = texto;
   if (resultado.estado === ESTADOS.INSUFICIENTE) {
